@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory & Sales Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5f5;
+            touch-action: manipulation;
+        }
+        .modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-md mx-auto min-h-screen bg-white shadow-lg">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white p-4">
+            <h1 class="text-xl font-bold">Inventory & Sales Manager</h1>
+        </header>
+
+        <!-- Main Navigation -->
+        <nav class="flex justify-around p-4 bg-white border-b">
+            <button onclick="showSection('inventory')" class="tab-btn active text-blue-600">
+                <i class="bi bi-box-seam text-xl"></i>
+                <span class="block text-sm">Inventory</span>
+            </button>
+            <button onclick="showSection('sales')" class="tab-btn text-gray-500">
+                <i class="bi bi-graph-up text-xl"></i>
+                <span class="block text-sm">Sales</span>
+            </button>
+            <button onclick="showSection('reports')" class="tab-btn text-gray-500">
+                <i class="bi bi-file-text text-xl"></i>
+                <span class="block text-sm">Reports</span>
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="p-4">
+            <!-- Inventory Section -->
+            <section id="inventory" class="section active">
+                <div class="flex justify-between mb-4">
+                    <h2 class="text-lg font-bold">Inventory Items</h2>
+                    <button onclick="showAddItemModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        <i class="bi bi-plus"></i> Add Item
+                    </button>
+                </div>
+                <div id="inventoryList" class="space-y-4 max-h-[70vh] overflow-y-auto"></div>
+            </section>
+
+            <!-- Sales Section -->
+            <section id="sales" class="section hidden">
+                <div class="flex justify-between mb-4">
+                    <h2 class="text-lg font-bold">Record Sale</h2>
+                    <button onclick="showNewSaleForm()" class="bg-green-600 text-white px-4 py-2 rounded-lg">
+                        <i class="bi bi-plus"></i> New Sale
+                    </button>
+                </div>
+                <div id="saleFormContainer" class="hidden bg-white p-4 rounded-lg shadow mb-4">
+                    <form id="newSaleForm" class="space-y-4">
+                        <h3 class="font-bold">Customer Information</h3>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Customer Name</label>
+                            <input type="text" id="newCustomerName" required class="w-full p-2 border rounded">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Email</label>
+                            <input type="email" id="newCustomerEmail" required class="w-full p-2 border rounded">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Mobile No.</label>
+                            <input type="tel" id="newCustomerPhone" required class="w-full p-2 border rounded">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Address</label>
+                            <textarea id="newCustomerAddress" required class="w-full p-2 border rounded"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Date of Sale</label>
+                            <input type="date" id="newSaleDate" required class="w-full p-2 border rounded">
+                        </div>
+                        
+                        <h3 class="font-bold mt-4">Product Selection</h3>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Select Product</label>
+                            <select id="productSelect" required class="w-full p-2 border rounded" onchange="updateUniqueIdsDropdown()">
+                                <option value="">-- Select Product --</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Select Unique ID</label>
+                            <select id="uniqueIdSelect" required class="w-full p-2 border rounded">
+                                <option value="">-- Select Unique ID --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-2">
+                            <button type="button" onclick="hideNewSaleForm()" class="px-4 py-2 border rounded">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Complete Sale</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div id="salesItemList" class="space-y-4 max-h-[70vh] overflow-y-auto"></div>
+            </section>
+
+            <!-- Reports Section -->
+            <section id="reports" class="section hidden">
+                <h2 class="text-lg font-bold mb-4">Sales Reports</h2>
+                <div id="salesReport" class="space-y-4">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h3 class="font-bold">Total Sales</h3>
+                        <p id="totalSales" class="text-2xl text-blue-600">₹0</p>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button onclick="downloadSalesReport()" class="bg-green-600 text-white px-4 py-2 rounded-lg w-full">
+                            <i class="bi bi-download"></i> Download Sales Report (Excel)
+                        </button>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">Recent Sales</h3>
+                        <div id="recentSalesList" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Add Item Modal -->
+        <div id="addItemModal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg w-11/12 max-w-md max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-bold mb-4">Add New Item</h3>
+                <form id="addItemForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Item Name</label>
+                        <input type="text" id="itemName" required class="w-full p-2 border rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Quantity</label>
+                        <input type="number" id="itemQuantity" required min="1" class="w-full p-2 border rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Price (₹)</label>
+                        <input type="number" step="0.01" id="itemPrice" required class="w-full p-2 border rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Date Added</label>
+                        <input type="date" id="itemDate" required class="w-full p-2 border rounded">
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="hideAddItemModal()" class="px-4 py-2 border rounded">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Add Item</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Record Sale Modal -->
+        <div id="recordSaleModal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg w-11/12 max-w-md max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-bold mb-4">Record Sale</h3>
+                <form id="recordSaleForm" class="space-y-4">
+                    <input type="hidden" id="saleItemId">
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Product</label>
+                        <input type="text" id="saleItemName" readonly class="w-full p-2 bg-gray-100 border rounded">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Price (₹)</label>
+                        <input type="text" id="saleItemPrice" readonly class="w-full p-2 bg-gray-100 border rounded">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Available Unique IDs</label>
+                        <select id="itemUniqueIdSelect" required class="w-full p-2 border rounded">
+                            <option value="">-- Select Unique ID --</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Customer Name</label>
+                        <input type="text" id="customerName" required class="w-full p-2 border rounded">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Email</label>
+                        <input type="email" id="customerEmail" required class="w-full p-2 border rounded">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Mobile No.</label>
+                        <input type="tel" id="customerPhone" required class="w-full p-2 border rounded">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Address</label>
+                        <textarea id="customerAddress" required class="w-full p-2 border rounded"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Date of Sale</label>
+                        <input type="date" id="saleDate" required class="w-full p-2 border rounded">
+                    </div>
+                    
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="hideRecordSaleModal()" class="px-4 py-2 border rounded">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Complete Sale</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
+        let sales = JSON.parse(localStorage.getItem('sales')) || [];
+        
+        // Check if inventory items have unique IDs - migrate old data if needed
+        let needsMigration = false;
+        inventory.forEach(item => {
+            if (!item.uniqueIds) {
+                needsMigration = true;
+            }
+        });
+        
+        // Migrate existing data to include unique IDs
+        if (needsMigration) {
+            inventory = inventory.map(item => {
+                if (!item.uniqueIds) {
+                    const uniqueIds = [];
+                    for (let i = 0; i < item.quantity; i++) {
+                        uniqueIds.push(`${item.id}-${i+1}`);
+                    }
+                    return {...item, uniqueIds};
+                }
+                return item;
+            });
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default date in all date inputs
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('itemDate').value = today;
+            document.getElementById('saleDate').value = today;
+            document.getElementById('newSaleDate').value = today;
+            
+            renderInventory();
+            updateProductDropdown();
+            updateSalesReport();
+            
+            // Show sales form by default as per new requirement
+            showSection('sales');
+            showNewSaleForm();
+        });
+
+        // Navigation
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById(sectionId).classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-blue-600');
+                btn.classList.add('text-gray-500');
+            });
+            
+            // Find the button that matches this section and highlight it
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if (btn.getAttribute('onclick').includes(sectionId)) {
+                    btn.classList.remove('text-gray-500');
+                    btn.classList.add('text-blue-600');
+                }
+            });
+        }
+
+        // Modal Controls
+        function showAddItemModal() {
+            document.getElementById('addItemModal').classList.remove('hidden');
+        }
+
+        function hideAddItemModal() {
+            document.getElementById('addItemModal').classList.add('hidden');
+            document.getElementById('addItemForm').reset();
+            // Reset date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('itemDate').value = today;
+        }
+        
+        function showRecordSaleModal(id) {
+            const item = inventory.find(item => item.id === id);
+            if (item && item.uniqueIds && item.uniqueIds.length > 0) {
+                document.getElementById('saleItemId').value = item.id;
+                document.getElementById('saleItemName').value = item.name;
+                document.getElementById('saleItemPrice').value = item.price;
+                
+                // Populate unique ID dropdown
+                const uniqueIdSelect = document.getElementById('itemUniqueIdSelect');
+                uniqueIdSelect.innerHTML = '<option value="">-- Select Unique ID --</option>';
+                
+                item.uniqueIds.forEach(uniqueId => {
+                    const option = document.createElement('option');
+                    option.value = uniqueId;
+                    option.textContent = uniqueId;
+                    uniqueIdSelect.appendChild(option);
+                });
+                
+                document.getElementById('recordSaleModal').classList.remove('hidden');
+            }
+        }
+
+        function hideRecordSaleModal() {
+            document.getElementById('recordSaleModal').classList.add('hidden');
+            document.getElementById('recordSaleForm').reset();
+            // Reset date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('saleDate').value = today;
+        }
+        
+        function showNewSaleForm() {
+            document.getElementById('saleFormContainer').classList.remove('hidden');
+            updateProductDropdown();
+        }
+        
+        function hideNewSaleForm() {
+            document.getElementById('saleFormContainer').classList.add('hidden');
+            document.getElementById('newSaleForm').reset();
+            // Reset date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('newSaleDate').value = today;
+        }
+        
+        function updateProductDropdown() {
+            const productSelect = document.getElementById('productSelect');
+            productSelect.innerHTML = '<option value="">-- Select Product --</option>';
+            
+            // Only show products with available inventory
+            const availableProducts = inventory.filter(item => item.uniqueIds && item.uniqueIds.length > 0);
+            
+            availableProducts.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = `${item.name} - ₹${item.price.toFixed(2)} (${item.uniqueIds.length} available)`;
+                productSelect.appendChild(option);
+            });
+        }
+        
+        function updateUniqueIdsDropdown() {
+            const productId = parseInt(document.getElementById('productSelect').value);
+            const uniqueIdSelect = document.getElementById('uniqueIdSelect');
+            uniqueIdSelect.innerHTML = '<option value="">-- Select Unique ID --</option>';
+            
+            if (!productId) return;
+            
+            const selectedProduct = inventory.find(item => item.id === productId);
+            if (selectedProduct && selectedProduct.uniqueIds) {
+                selectedProduct.uniqueIds.forEach(uniqueId => {
+                    const option = document.createElement('option');
+                    option.value = uniqueId;
+                    option.textContent = uniqueId;
+                    uniqueIdSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Form Handling
+        document.getElementById('addItemForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const itemId = Date.now();
+            const quantity = parseInt(document.getElementById('itemQuantity').value);
+            
+            // Create unique IDs for each quantity
+            const uniqueIds = [];
+            for (let i = 0; i < quantity; i++) {
+                uniqueIds.push(`${itemId}-${i+1}`);
+            }
+            
+            const newItem = {
+                id: itemId,
+                name: document.getElementById('itemName').value,
+                quantity: quantity,
+                price: parseFloat(document.getElementById('itemPrice').value),
+                dateAdded: document.getElementById('itemDate').value,
+                uniqueIds: uniqueIds
+            };
+            
+            inventory.push(newItem);
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            renderInventory();
+            updateProductDropdown();
+            hideAddItemModal();
+            
+            // Show success message
+            alert(`Item added successfully with ${quantity} unique IDs created.`);
+        });
+        
+        document.getElementById('recordSaleForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const itemId = parseInt(document.getElementById('saleItemId').value);
+            const selectedUniqueId = document.getElementById('itemUniqueIdSelect').value;
+            
+            const item = inventory.find(item => item.id === itemId);
+            
+            if (item && selectedUniqueId) {
+                // Create sale record
+                const sale = {
+                    id: Date.now(),
+                    itemId: item.id,
+                    itemName: item.name,
+                    uniqueId: selectedUniqueId,
+                    quantity: 1, // Each unique ID represents 1 quantity
+                    price: item.price,
+                    customerName: document.getElementById('customerName').value,
+                    customerEmail: document.getElementById('customerEmail').value,
+                    customerPhone: document.getElementById('customerPhone').value,
+                    customerAddress: document.getElementById('customerAddress').value,
+                    date: document.getElementById('saleDate').value,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Remove the unique ID from inventory
+                item.uniqueIds = item.uniqueIds.filter(id => id !== selectedUniqueId);
+                item.quantity = item.uniqueIds.length;
+                
+                sales.push(sale);
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                localStorage.setItem('sales', JSON.stringify(sales));
+                
+                renderInventory();
+                updateProductDropdown();
+                updateSalesReport();
+                hideRecordSaleModal();
+                
+                // Show success message
+                alert('Sale completed successfully!');
+            }
+        });
+        
+        document.getElementById('newSaleForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const productId = parseInt(document.getElementById('productSelect').value);
+            const selectedUniqueId = document.getElementById('uniqueIdSelect').value;
+            
+            const item = inventory.find(item => item.id === productId);
+            
+            if (item && selectedUniqueId) {
+                // Create sale record
+                const sale = {
+                    id: Date.now(),
+                    itemId: item.id,
+                    itemName: item.name,
+                    uniqueId: selectedUniqueId,
+                    quantity: 1, // Each unique ID represents 1 quantity
+                    price: item.price,
+                    customerName: document.getElementById('newCustomerName').value,
+                    customerEmail: document.getElementById('newCustomerEmail').value,
+                    customerPhone: document.getElementById('newCustomerPhone').value,
+                    customerAddress: document.getElementById('newCustomerAddress').value,
+                    date: document.getElementById('newSaleDate').value,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Remove the unique ID from inventory
+                item.uniqueIds = item.uniqueIds.filter(id => id !== selectedUniqueId);
+                item.quantity = item.uniqueIds.length;
+                
+                sales.push(sale);
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                localStorage.setItem('sales', JSON.stringify(sales));
+                
+                renderInventory();
+                updateProductDropdown();
+                updateSalesReport();
+                
+                // Reset form but keep it open for another sale
+                document.getElementById('newSaleForm').reset();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('newSaleDate').value = today;
+                updateProductDropdown();
+                
+                alert('Sale completed successfully!');
+            }
+        });
+
+        // Render Functions
+        function renderInventory() {
+            const inventoryList = document.getElementById('inventoryList');
+            const salesItemList = document.getElementById('salesItemList');
+            
+            inventoryList.innerHTML = '';
+            salesItemList.innerHTML = '';
+
+            // Sort items alphabetically by name
+            const sortedInventory = [...inventory].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedInventory.forEach(item => {
+                // Format date
+                const dateAdded = new Date(item.dateAdded).toLocaleDateString();
+                
+                // Get actual quantity from unique IDs
+                const actualQuantity = item.uniqueIds ? item.uniqueIds.length : 0;
+                
+                // Inventory view
+                const inventoryItem = `
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold">${item.name}</h3>
+                                <p class="text-sm text-gray-600">Quantity: ${actualQuantity}</p>
+                                <p class="text-sm text-gray-600">Price: ₹${item.price.toFixed(2)}</p>
+                                <p class="text-sm text-gray-600">Added: ${dateAdded}</p>
+                                <details class="mt-2">
+                                    <summary class="text-sm text-blue-600 cursor-pointer">Show Unique IDs</summary>
+                                    <div class="mt-2 p-2 bg-gray-50 rounded text-xs max-h-20 overflow-y-auto">
+                                        ${item.uniqueIds && item.uniqueIds.length > 0 ? item.uniqueIds.join(', ') : 'No unique IDs available'}
+                                    </div>
+                                </details>
+                            </div>
+                            <button onclick="deleteItem(${item.id})" class="text-red-500">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                inventoryList.insertAdjacentHTML('beforeend', inventoryItem);
+
+                // Sales view (only if there are unique IDs available)
+                if (actualQuantity > 0) {
+                    const salesItem = `
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="font-bold">${item.name}</h3>
+                                    <p class="text-sm text-gray-600">In Stock: ${actualQuantity}</p>
+                                    <p class="text-sm text-gray-600">Price: ₹${item.price.toFixed(2)}</p>
+                                    <p class="text-sm text-gray-600">Added: ${dateAdded}</p>
+                                </div>
+                                <button onclick="showRecordSaleModal(${item.id})" class="bg-green-500 text-white px-4 py-2 rounded">
+                                    Sell
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    salesItemList.insertAdjacentHTML('beforeend', salesItem);
+                }
+            });
+            
+            // Show empty state message if no items
+            if (sortedInventory.length === 0) {
+                inventoryList.innerHTML = `
+                    <div class="text-center p-8 text-gray-500">
+                        <i class="bi bi-inbox text-4xl mb-2"></i>
+                        <p>No inventory items yet. Add an item to get started.</p>
+                    </div>
+                `;
+                salesItemList.innerHTML = `
+                    <div class="text-center p-8 text-gray-500">
+                        <i class="bi bi-inbox text-4xl mb-2"></i>
+                        <p>No inventory items available for sale.</p>
+                    </div>
+                `;
+            } else if (salesItemList.innerHTML === '') {
+                salesItemList.innerHTML = `
+                    <div class="text-center p-8 text-gray-500">
+                        <i class="bi bi-inbox text-4xl mb-2"></i>
+                        <p>No inventory items available for sale.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateSalesReport() {
+            const total = sales.reduce((sum, sale) => sum + sale.price, 0);
+            document.getElementById('totalSales').textContent = `₹${total.toFixed(2)}`;
+            
+            // Update recent sales list
+            const recentSalesList = document.getElementById('recentSalesList');
+            recentSalesList.innerHTML = '';
+            
+            // Sort sales by date, newest first
+            const sortedSales = [...sales].sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            sortedSales.forEach(sale => {
+                const saleDate = new Date(sale.date).toLocaleDateString();
+                const saleItem = `
+                    <div class="bg-white p-3 rounded shadow-sm">
+                        <div class="flex justify-between">
+                            <div>
+                                <h4 class="font-medium">${sale.itemName}</h4>
+                                <p class="text-sm text-gray-600">To: ${sale.customerName}</p>
+                                <p class="text-xs text-gray-500">${saleDate}</p>
+                                <p class="text-xs text-gray-500">ID: ${sale.uniqueId || 'N/A'}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium text-green-600">₹${sale.price.toFixed(2)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                recentSalesList.insertAdjacentHTML('beforeend', saleItem);
+            });
+            
+            // Show empty state message if no sales
+            if (sortedSales.length === 0) {
+                recentSalesList.innerHTML = `
+                    <div class="text-center p-4 text-gray-500">
+                        <p>No sales recorded yet.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Actions
+        function deleteItem(id) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                inventory = inventory.filter(item => item.id !== id);
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                renderInventory();
+                updateProductDropdown();
+            }
+        }
+
+        function downloadSalesReport() {
+            if (sales.length === 0) {
+                alert("No sales data to download.");
+                return;
+            }
+            
+            // Prepare data for Excel
+            const data = sales.map(sale => ({
+                'Sale Date': sale.date,
+                'Product': sale.itemName,
+                'Unique ID': sale.uniqueId || 'N/A',
+                'Amount (₹)': sale.price.toFixed(2),
+                'Customer Name': sale.customerName,
+                'Email': sale.customerEmail,
+                'Phone': sale.customerPhone,
+                'Address': sale.customerAddress
+            }));
+            
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet(data);
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
+            
+            // Generate filename with current date
+            const fileName = `Sales_Report_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+            
+            // Write and download
+            XLSX.writeFile(wb, fileName);
+        }
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
